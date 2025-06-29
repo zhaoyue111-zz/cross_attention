@@ -1,5 +1,5 @@
 # cross_attention
-前提：共5个域，
+前提：共5个域
 | 域编号 | 训练集数量 | 测试集数量 | 数据来源               |
 |------|------------|------------|------------------------|
 | 01   | 51         | 50         | DRISHTI-GS    |
@@ -11,13 +11,38 @@
 
 整体思路：
 1. 构建输入图像对：这里需要确定一个目标域，将目标域的图片按顺序与源域的图片随机组合，沿通道方向堆叠，目标域图片在前。比如要分割的是1域，那么就组合(1_1, 2_5),(1_1, 3_78),(1_1, 4_55),(1_1, 5_67),(1_2, 2_78)....其中来自1域的图片形成前3个通道，来自其它域的图片形成后3个通道。代码见mydataset.py，其中包括数据增强。
-2. 构建encoder(swintransformerv2.py)：
-   （1）patch_embeded：(B, H, W, 3)-->(B, L, C)
-      core:x = self.proj(x).flatten(2).transpose(1, 2)
-   （2）加位置编码：绝对位置编码：self.absolute_pos_embed = nn.Parameter(torch.zeros(1, embed_dim, patches_resolution[0], patches_resolution[1]))
-                                trunc_normal_(self.absolute_pos_embed, std=.02)
-                  相对位置编码：self.pos_embd = SinPositionalEncoding2D(embed_dim).cuda()
-   （3）通过4(num_layers)层的basic_layer，每个basic_layer由四层(depths)swinT+一层patch merging组成，因此每经过一层，C变为2倍，L变1/4（H->H/2,W->W/2，H*W->H*W/4）。
+2. 构建 encoder（`swintransformerv2.py`）：
+
+   - （1）Patch Embedding: `(B, H, W, 3)` → `(B, L, C)`
+     
+     ```python
+     core: x = self.proj(x).flatten(2).transpose(1, 2)
+     ```
+
+   - （2）加位置编码：
+     
+     - **绝对位置编码**：
+       
+       ```python
+       self.absolute_pos_embed = nn.Parameter(
+           torch.zeros(1, embed_dim, patches_resolution[0], patches_resolution[1])
+       )
+       trunc_normal_(self.absolute_pos_embed, std=.02)
+       ```
+
+     - **相对位置编码**：
+       
+       ```python
+       self.pos_embd = SinPositionalEncoding2D(embed_dim).cuda()
+       ```
+
+   - （3）通过 4 (`num_layers`) 层的 `BasicLayer`：
+     
+     - 每个 `BasicLayer` 包含 4 层（`depths`）Swin Transformer 和一层 `PatchMerging`
+     - 每经过一层：
+       - 通道数 `C` → 2 倍
+       - Token 数 `L` → 1/4，即 `(H×W) → (H/2×W/2) = H×W/4`
+
     ![image](https://github.com/user-attachments/assets/4327ea3a-fd4a-40e4-9e08-445d55d5d07f)
 
    （4）总体结构：
